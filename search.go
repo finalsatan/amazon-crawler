@@ -307,9 +307,15 @@ func (s *searchStruct) requestProductDetail(url string) (*goquery.Document, erro
 }
 
 func (s *searchStruct) daysUntil(targetDate string) (int, error) {
-	// 解析目标日期字符串
-	layout := "Monday, January 2"
-	targetTime, err := time.Parse(layout, targetDate)
+	// 解析目标日期字符串 "Monday, January 2"
+	dateStrs := strings.Split(targetDate, ",")
+	onlyTargetDate := ""
+	if len(dateStrs) > 1 {
+		onlyTargetDate = dateStrs[1]
+		onlyTargetDate = strings.Trim(onlyTargetDate, " \t\n")
+	}
+	layout := "January 2"
+	targetTime, err := time.Parse(layout, onlyTargetDate)
 	if err != nil {
 		return 0, err
 	}
@@ -346,6 +352,23 @@ func (s *searchStruct) parseGridInfo(doc *goquery.Document) map[string]string {
 	wholePrice := doc.Find("#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center.aok-relative > span.a-price.aok-align-center.reinventPricePriceToPayMargin.priceToPay > span:nth-child(2) > span.a-price-whole").First().Text()
 	fractionPrice := doc.Find("#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center.aok-relative > span.a-price.aok-align-center.reinventPricePriceToPayMargin.priceToPay > span:nth-child(2) > span.a-price-fraction").First().Text()
 	data["Price"] = wholePrice + fractionPrice
+	data["Price"] = strings.Trim(data["Price"], " \t\n")
+	if len(data["Price"]) == 0 {
+		wholePrice = doc.Find("#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center > span.a-text-normal > span > span:nth-child(2) > span.a-price-whole").First().Text()
+		fractionPrice = doc.Find("#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center > span.a-text-normal > span > span:nth-child(2) > span.a-price-fraction").First().Text()
+		data["Price"] = wholePrice + fractionPrice
+		data["Price"] = strings.Trim(data["Price"], " \t\n")
+	}
+	if len(data["Price"]) == 0 {
+		price := doc.Find("#sns-base-price > div > span.a-price.a-text-price.a-size-medium.apexPriceToPay > span:nth-child(2)").First().Text()
+		price = strings.TrimPrefix(price, "$")
+		data["Price"] = price
+	}
+	if len(data["Price"]) == 0 {
+		price := doc.Find("#priceblock_ourprice > span").First().Text()
+		price = strings.TrimPrefix(price, "$")
+		data["Price"] = price
+	}
 
 	// 爬取delivery信息
 	// #mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE > span > a
@@ -369,6 +392,11 @@ func (s *searchStruct) parseGridInfo(doc *goquery.Document) map[string]string {
 	fastestDeliveryKey := doc.Find("#mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE > span").First().Text()
 	fastestDeliveryValue := doc.Find("#mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE > span > span.a-text-bold").First().Text()
 	data["Fastest delivery"] = fastestDeliveryValue
+
+	fastestDeliveryKey = strings.Trim(fastestDeliveryKey, " \t\n")
+	if len(fastestDeliveryKey) == 0 {
+		fastestDeliveryKey = doc.Find("#almLogoAndDeliveryMessage_feature_div > div > div > span").First().Text()
+	}
 	data["Fastest delivery whole"] = fastestDeliveryKey
 
 	fastestDeliveryDays, err := s.daysUntil(fastestDeliveryValue)
@@ -381,17 +409,27 @@ func (s *searchStruct) parseGridInfo(doc *goquery.Document) map[string]string {
 	}
 	data["Fastest delivery days"] = fastestDeliveryDaysStr
 
+	// 查询 ships from 和 sold by
 	// 首先根据提供的selector查询整个grid元素
 	gridSelector := "#offer-display-features > div > div.a-expander-content.a-expander-partial-collapse-content > div.offer-display-features-container"
 	grid := doc.Find(gridSelector)
 
-	shipsFromKey := grid.Find("#fulfillerInfoFeature_feature_div > div.offer-display-feature-label.celwidget > div > span").First().Text()
 	shipsFromValue := grid.Find("#fulfillerInfoFeature_feature_div > div.offer-display-feature-text > div > span").First().Text()
-	data[shipsFromKey] = shipsFromValue
+	shipsFromValue = strings.Trim(shipsFromValue, " \t\n")
 
-	soldByKey := grid.Find("#merchantInfoFeature_feature_div > div.offer-display-feature-label.celwidget > div > span").First().Text()
 	soldByValue := grid.Find("#merchantInfoFeature_feature_div > div.offer-display-feature-text > div > span").First().Text()
-	data[soldByKey] = soldByValue
+	soldByValue = strings.Trim(soldByValue, " \t\n")
+
+	if len(shipsFromValue) == 0 || len(soldByValue) == 0 {
+		shipsFromValue = doc.Find("#almShipsFromSoldBy_feature_div > div > table > tbody > tr:nth-child(1) > td:nth-child(2) > span").First().Text()
+		soldByValue = doc.Find("#almShipsFromSoldBy_feature_div > div > table > tbody > tr:nth-child(2) > td:nth-child(2) > span").First().Text()
+	}
+
+	shipsFromValue = strings.Trim(shipsFromValue, " \t\n")
+	soldByValue = strings.Trim(soldByValue, " \t\n")
+
+	data["Ships from"] = shipsFromValue
+	data["Sold by"] = soldByValue
 
 	return data
 }

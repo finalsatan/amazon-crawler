@@ -20,7 +20,7 @@
 -- Current Database: `amazon`
 --
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `amazon` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `amazon` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE `amazon`;
 
@@ -149,7 +149,7 @@ CREATE TABLE `category` (
   `en_key` varchar(50) NOT NULL,
   `priority` int(11) DEFAULT '0',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1016 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1016 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -181,7 +181,7 @@ CREATE TABLE `product` (
   `app` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `url` (`url`)
-) ENGINE=InnoDB AUTO_INCREMENT=462720 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=462720 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,7 +202,7 @@ CREATE TABLE `search_statistics` (
   PRIMARY KEY (`id`),
   KEY `category_id` (`category_id`),
   CONSTRAINT `search_statistics_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `category` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2352 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=2352 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -224,7 +224,7 @@ CREATE TABLE `seller` (
   `company_id` char(16) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `seller_id_UNIQUE` (`seller_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=115634 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=115634 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -388,15 +388,18 @@ ADD COLUMN `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP AFTER `fastest
 ADD COLUMN `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER `create_time`;
 
 ALTER TABLE `amazon`.`product` 
-MODIFY COLUMN `complete_url` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '商品完整链接' AFTER `app`,
-MODIFY COLUMN `search_zh_key` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '搜索词-中文' AFTER `complete_url`,
-MODIFY COLUMN `search_en_key` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '搜索词-英文' AFTER `search_zh_key`,
-MODIFY COLUMN `bought_in_past_month` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '过去一个月的销量' AFTER `ships_from`,
-MODIFY COLUMN `price` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '价格' AFTER `bought_in_past_month`,
-MODIFY COLUMN `free_delivery` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '免费运送的到货日期' AFTER `price`,
-MODIFY COLUMN `free_delivery_days` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '免费运送的到货日期距离当前时间的天数' AFTER `free_delivery`,
-MODIFY COLUMN `fastest_delivery` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '最快运送的到货日期' AFTER `free_delivery_days`,
-MODIFY COLUMN `fastest_delivery_days` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '最快运送的到货日期距离当前时间的天数' AFTER `fastest_delivery`,
-MODIFY COLUMN `fastest_delivery_whole` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '最快运送的完整日期信息' AFTER `fastest_delivery_days`,
+MODIFY COLUMN `param` varchar(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL AFTER `url`;
+
+ALTER TABLE `amazon`.`product` 
+MODIFY COLUMN `complete_url` varchar(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '商品完整链接' AFTER `app`,
+MODIFY COLUMN `search_zh_key` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '搜索词-中文' AFTER `complete_url`,
+MODIFY COLUMN `search_en_key` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '搜索词-英文' AFTER `search_zh_key`,
+MODIFY COLUMN `bought_in_past_month` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '过去一个月的销量' AFTER `ships_from`,
+MODIFY COLUMN `price` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '价格' AFTER `bought_in_past_month`,
+MODIFY COLUMN `free_delivery` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '免费运送的到货日期' AFTER `price`,
+MODIFY COLUMN `free_delivery_days` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '免费运送的到货日期距离当前时间的天数' AFTER `free_delivery`,
+MODIFY COLUMN `fastest_delivery` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '最快运送的到货日期' AFTER `free_delivery_days`,
+MODIFY COLUMN `fastest_delivery_days` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '最快运送的到货日期距离当前时间的天数' AFTER `fastest_delivery`,
+MODIFY COLUMN `fastest_delivery_whole` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '最快运送的完整日期信息' AFTER `fastest_delivery_days`,
 MODIFY COLUMN `create_time` timestamp(0) NULL DEFAULT CURRENT_TIMESTAMP(0) COMMENT '创建时间' AFTER `fastest_delivery_whole`,
 MODIFY COLUMN `update_time` timestamp(0) NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0) COMMENT '更新时间' AFTER `create_time`;
