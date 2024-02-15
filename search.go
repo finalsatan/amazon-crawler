@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/tengfei-xy/go-log"
@@ -304,8 +306,80 @@ func (s *searchStruct) requestProductDetail(url string) (*goquery.Document, erro
 	return doc, nil
 }
 
+func (s *searchStruct) daysUntil(targetDate string) (int, error) {
+	// 解析目标日期字符串
+	layout := "Monday, January 2"
+	targetTime, err := time.Parse(layout, targetDate)
+	if err != nil {
+		return 0, err
+	}
+
+	// 获取当前时间
+	currentTime := time.Now()
+	// 修改 targetTime 的年份为当前年份
+	targetTime = targetTime.AddDate(currentTime.Year()-targetTime.Year(), 0, 0)
+
+	// 如果目标日期在当前日期之前，则表示跨年，年份加一
+	if targetTime.Before(currentTime) {
+		targetTime = targetTime.AddDate(1, 0, 0)
+	}
+
+	// 计算天数差距
+	days := int(targetTime.Sub(currentTime).Hours()/24) + 1
+
+	return days, nil
+}
+
 func (s *searchStruct) parseGridInfo(doc *goquery.Document) map[string]string {
 	data := make(map[string]string)
+
+	// 爬取<span>10K+ bought in past month</span>
+	boughtInPastMonth := doc.Find("#social-proofing-faceout-title-tk_bought > span").First().Text()
+	boughtInPastMonth = strings.Trim(boughtInPastMonth, " \t\n")
+	boughtInPastMonth = strings.TrimSuffix(boughtInPastMonth, " bought in past month")
+
+	data["Bought in past month"] = boughtInPastMonth
+
+	// 爬取价格
+	// 整数价格：#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center.aok-relative > span.a-price.aok-align-center.reinventPricePriceToPayMargin.priceToPay > span:nth-child(2) > span.a-price-whole
+	// 小数价格：#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center.aok-relative > span.a-price.aok-align-center.reinventPricePriceToPayMargin.priceToPay > span:nth-child(2) > span.a-price-fraction
+	wholePrice := doc.Find("#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center.aok-relative > span.a-price.aok-align-center.reinventPricePriceToPayMargin.priceToPay > span:nth-child(2) > span.a-price-whole").First().Text()
+	fractionPrice := doc.Find("#corePriceDisplay_desktop_feature_div > div.a-section.a-spacing-none.aok-align-center.aok-relative > span.a-price.aok-align-center.reinventPricePriceToPayMargin.priceToPay > span:nth-child(2) > span.a-price-fraction").First().Text()
+	data["Price"] = wholePrice + fractionPrice
+
+	// 爬取delivery信息
+	// #mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE > span > a
+	// #mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE > span > span
+	// #mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE > span
+	// #mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE > span > span.a-text-bold
+
+	// freeDeliveryKey := doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE > span > a").First().Text()
+	freeDeliveryValue := doc.Find("#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE > span > span").First().Text()
+	data["Free delivery"] = freeDeliveryValue
+	freeDeliveryDays, err := s.daysUntil(freeDeliveryValue)
+	freeDeliveryDaysStr := ""
+
+	if err != nil {
+		log.Errorf("计算 freeDeliveryDays  失败:%s %v", freeDeliveryValue, err)
+	} else {
+		freeDeliveryDaysStr = strconv.Itoa(freeDeliveryDays)
+	}
+	data["Free delivery days"] = freeDeliveryDaysStr
+
+	fastestDeliveryKey := doc.Find("#mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE > span").First().Text()
+	fastestDeliveryValue := doc.Find("#mir-layout-DELIVERY_BLOCK-slot-SECONDARY_DELIVERY_MESSAGE_LARGE > span > span.a-text-bold").First().Text()
+	data["Fastest delivery"] = fastestDeliveryValue
+	data["Fastest delivery whole"] = fastestDeliveryKey
+
+	fastestDeliveryDays, err := s.daysUntil(fastestDeliveryValue)
+	fastestDeliveryDaysStr := ""
+
+	if err != nil {
+		log.Errorf("计算 fastestDeliveryDays  失败:%s %v", fastestDeliveryValue, err)
+	} else {
+		fastestDeliveryDaysStr = strconv.Itoa(fastestDeliveryDays)
+	}
+	data["Fastest delivery days"] = fastestDeliveryDaysStr
 
 	// 首先根据提供的selector查询整个grid元素
 	gridSelector := "#offer-display-features > div > div.a-expander-content.a-expander-partial-collapse-content > div.offer-display-features-container"
@@ -329,6 +403,10 @@ func (s *searchStruct) deal_prouct_url(link string) {
 	}
 	url := strings.Split(link, "/ref=")
 	link = fmt.Sprintf("https://%s%s", app.Domain, link)
+	if err := robot.IsAllow(userAgent, link); err != nil {
+		log.Errorf("该链接不允许被爬取 %s %v", link, err)
+		return
+	}
 	doc, err := s.requestProductDetail(link)
 	if err != nil {
 		log.Errorf("查询商品详情页面失败 链接:%s %v", link, err)
@@ -337,7 +415,12 @@ func (s *searchStruct) deal_prouct_url(link string) {
 	grid_data := s.parseGridInfo(doc)
 
 	// log.Infof("找到商品 关键词:%s 链接:%s 商品ID的url:%s 商品参数的url:%s ", s.zh_key, link, url[0], product_param)
-	_, err = app.db.Exec(`INSERT INTO product(url,param,complete_url,search_zh_key,search_en_key,sold_by,ships_from) values(?,?,?,?,?,?,?)`, url[0], "/ref="+url[1], link, s.zh_key, s.en_key, grid_data["Ships from"], grid_data["Sold by"])
+	_, err = app.db.Exec(`INSERT INTO product(url,param,complete_url,search_zh_key,search_en_key,sold_by,ships_from,
+		bought_in_past_month,price,free_delivery,free_delivery_days,fastest_delivery,fastest_delivery_days,
+		fastest_delivery_whole) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, url[0], "/ref="+url[1], link, s.zh_key, s.en_key,
+		grid_data["Sold by"], grid_data["Ships from"], grid_data["Bought in past month"], grid_data["Price"],
+		grid_data["Free delivery"], grid_data["Free delivery days"], grid_data["Fastest delivery"], grid_data["Fastest delivery days"],
+		grid_data["Fastest delivery whole"])
 
 	if is_duplicate_entry(err) {
 		log.Infof("商品已存在 关键词:%s 链接:%s ", s.zh_key, link)
