@@ -248,17 +248,97 @@ func (s *searchStruct) get_product_url(doc *goquery.Document) {
 
 	})
 }
+
+func (s *searchStruct) requestProductDetail(url string) (*goquery.Document, error) {
+	client := get_client()
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authority", app.Domain)
+	req.Header.Set("Accept", `text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7`)
+	req.Header.Set("Accept-Language", `zh-CN,zh;q=0.9`)
+	req.Header.Set("cache-control", `max-age=0`)
+	req.Header.Set("device-memory", `8`)
+	req.Header.Set("downlink", `1.5'`)
+	req.Header.Set("dpr", `2`)
+	req.Header.Set("ect", `3g`)
+	req.Header.Set("rtt", `350`)
+	if _, err := app.get_cookie(); err != nil {
+		log.Error(err)
+	} else {
+		req.Header.Set("Cookie", app.cookie)
+	}
+	req.Header.Set("upgrade-insecure-requests", `1`)
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/?k=Hardware+electricia%%27n&crid=3CR8DCX0B3L5U&sprefix=hardware+electricia%%27n%%2Caps%%2C714&ref=nb_sb_noss", app.Domain))
+	req.Header.Set("Sec-Fetch-Dest", `empty`)
+	req.Header.Set("Sec-Fetch-Mode", `cors`)
+	req.Header.Set("Sec-Fetch-Site", `same-origin`)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("sec-ch-ua", `"Not.A/Brand";v="8", "Chromium";v="114", "Google Chrome";v="114"`)
+	req.Header.Set("sec-ch-ua-mobile", `?0`)
+	req.Header.Set("sec-ch-ua-platform", `"macOS"`)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Errorf("内部错误:%v", err)
+		return nil, err
+
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Errorf("状态码:%d", resp.StatusCode)
+		return nil, err
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("内部错误:%v", err)
+	}
+
+	if doc.Find("h4").First().Text() == "Enter the characters you see below" {
+		return nil, ERROR_VERIFICATION
+	}
+
+	return doc, nil
+}
+
+func (s *searchStruct) parseGridInfo(doc *goquery.Document) map[string]string {
+	data := make(map[string]string)
+
+	// 首先根据提供的selector查询整个grid元素
+	gridSelector := "#offer-display-features > div > div.a-expander-content.a-expander-partial-collapse-content > div.offer-display-features-container"
+	grid := doc.Find(gridSelector)
+
+	shipsFromKey := grid.Find("#fulfillerInfoFeature_feature_div > div.offer-display-feature-label.celwidget > div > span").First().Text()
+	shipsFromValue := grid.Find("#fulfillerInfoFeature_feature_div > div.offer-display-feature-text > div > span").First().Text()
+	data[shipsFromKey] = shipsFromValue
+
+	soldByKey := grid.Find("#merchantInfoFeature_feature_div > div.offer-display-feature-label.celwidget > div > span").First().Text()
+	soldByValue := grid.Find("#merchantInfoFeature_feature_div > div.offer-display-feature-text > div > span").First().Text()
+	data[soldByKey] = soldByValue
+
+	return data
+}
+
 func (s *searchStruct) deal_prouct_url(link string) {
 	if !strings.Contains(link, "/ref=") || strings.HasPrefix(link, "https://") {
 		log.Errorf("非预设的链接跳过此链接:%s", link)
 		return
 	}
 	url := strings.Split(link, "/ref=")
+	link = fmt.Sprintf("https://%s%s", app.Domain, link)
+	doc, err := s.requestProductDetail(link)
+	if err != nil {
+		log.Errorf("查询商品详情页面失败 链接:%s %v", link, err)
+		return
+	}
+	grid_data := s.parseGridInfo(doc)
 
 	// log.Infof("找到商品 关键词:%s 链接:%s 商品ID的url:%s 商品参数的url:%s ", s.zh_key, link, url[0], product_param)
-	_, err := app.db.Exec(`INSERT INTO product(url,param) values(?,?)`, url[0], "/ref="+url[1])
+	_, err = app.db.Exec(`INSERT INTO product(url,param,complete_url,search_zh_key,search_en_key,sold_by,ships_from) values(?,?,?,?,?,?,?)`, url[0], "/ref="+url[1], link, s.zh_key, s.en_key, grid_data["Ships from"], grid_data["Sold by"])
 
-	link = fmt.Sprintf("https://%s%s", app.Domain, link)
 	if is_duplicate_entry(err) {
 		log.Infof("商品已存在 关键词:%s 链接:%s ", s.zh_key, link)
 		return

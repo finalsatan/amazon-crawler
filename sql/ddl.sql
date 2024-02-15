@@ -369,3 +369,11 @@ USE `amazon`;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2024-02-06 12:22:02
+
+
+ALTER TABLE `amazon`.`product` 
+ADD COLUMN `complete_url` varchar(2048) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `valid`,
+ADD COLUMN `search_zh_key` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `complete_url`,
+ADD COLUMN `search_en_key` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `search_zh_key`,
+ADD COLUMN `sold_by` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `search_en_key`,
+ADD COLUMN `ships_from` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `sold_by`;
